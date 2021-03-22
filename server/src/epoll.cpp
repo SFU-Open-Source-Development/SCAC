@@ -81,7 +81,7 @@ static void deleteEpoll(int32_t fd){
 	}
 	else{
 		// Close file descriptor
-		if(close(fd) == 1){
+		if(close(fd) == -1){
 			std::cout << "Failed to close socket " << fd << std::endl;
 		}
 		else{
