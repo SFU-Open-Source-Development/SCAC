@@ -1,6 +1,7 @@
 #include <iostream>
-#include <string.h>
-#include <pthread.h>
+#include <string>
+#include <thread>
+#include <cstring>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -35,7 +36,7 @@ static int32_t getSocket(void){
 }
 
 // Listens for incoming connections
-void* listenThread(void* arg){
+static void listenThread(void){
 
 	struct sockaddr_in peer_addr;
 	socklen_t peer_addr_size = sizeof(peer_addr);	
@@ -61,7 +62,6 @@ void* listenThread(void* arg){
 			std::cerr << "Error on epoll_ctl!" << std::endl;
 		}
 	}
-	return 0;
 }
 
 // Creates an epoll instance
@@ -95,8 +95,7 @@ int main(void){
 	sockfd = getSocket();
 	epollfd = getEpoll();
 	
-	pthread_t tid;
-	pthread_create(&tid, NULL, listenThread, NULL);
+	std::thread listenThreadId(listenThread);
 	
 	constexpr uint32_t buffSize = 1024;
 	char recvBuf[buffSize];
@@ -119,7 +118,7 @@ int main(void){
 		}
 	}
 	
-	pthread_join(tid, NULL);
+	listenThreadId.join();
 	return 0;
 	
 }
