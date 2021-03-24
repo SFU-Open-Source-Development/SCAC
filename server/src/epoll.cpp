@@ -6,11 +6,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include "LRUCache.h"
 
 
 // Declare epoll instance and tcp socket in global namespace TEMPORARY
 static int32_t epollfd;
 static int32_t sockfd;
+static LRUCache<int32_t> cache;
 
 // Generates and binds a tcp socket
 static int32_t getSocket(void){
@@ -61,6 +63,8 @@ static void listenThread(void){
 		if(epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &epollStruct) == -1){
 			std::cerr << "Error on epoll_ctl!" << std::endl;
 		}
+		// Add to cache
+		cache.insert(fd);
 	}
 }
 
@@ -110,11 +114,15 @@ int main(void){
 		// Read value
 		int32_t res = recv(epollStruct.data.fd, recvBuf, 1024, 0);
 		if(res == 0){
-			// Connection broken?
+			// Connection closed
 			deleteEpoll(epollStruct.data.fd);
+			cache.remove(epollStruct.data.fd);
+			cache.print_cache();
 		}
 		else{
 			std::cout << "fd: " << epollStruct.data.fd << " msg: " << recvBuf;
+			cache.update(epollStruct.data.fd);
+			cache.print_cache();
 		}
 	}
 	
