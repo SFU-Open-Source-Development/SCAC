@@ -22,8 +22,7 @@
 static int32_t epollfd;
 static int32_t sockfd;
 static LRUCache<int32_t> cache;
-static ChatRoom<std::string, int32_t> rooms;
-static std::unordered_map<int32_t, std::string> userInfo;
+static ChatRoom<int32_t, std::string> rooms;
 
 // Generates and binds a tcp socket
 static int32_t getSocket(void)
@@ -77,8 +76,8 @@ static void listenThread(void)
 			std::cerr << "Error on epoll_ctl!" << std::endl;
 		}
 		
-		// Add to userInfo
-		userInfo.insert_or_assign(fd, "");
+		// Add to rooms
+		rooms.add(fd);
 		
 		// Add to cache
 		cache.insert(fd);
@@ -128,16 +127,7 @@ static void messageParser(char *msg, T id)
 			tok = std::strtok(NULL, " \t\n\v\f\r");
 			if(tok){
 				std::cout << "hosting: " << tok << std::endl;
-				if(rooms.host(tok, id)){
-					// Update userInfo
-					auto const pair = userInfo.find(id);
-					if(pair != userInfo.end() && pair->second != ""){
-						// Exit current room
-						rooms.exit(pair->second, id);
-					}
-					// Set to new room
-					userInfo.insert_or_assign(id, tok);
-				}
+				rooms.host(id, tok);
 			}
 			return;
 		}
@@ -145,41 +135,17 @@ static void messageParser(char *msg, T id)
 			tok = std::strtok(NULL, " \t\n\v\f\r");
 			if(tok){
 				std::cout << "joining: " << tok << std::endl;
-				if(rooms.join(tok, id)){
-					// Update userInfo
-					auto const pair = userInfo.find(id);
-					if(pair != userInfo.end() && pair->second != ""){
-						// Exit current room
-						rooms.exit(pair->second, id);
-					}
-					// Set to new room
-					userInfo.insert_or_assign(id, tok);
-				}
+				rooms.join(id, tok);
 			}
 			return;
 		}
-		else if(strcmp(tok, "/exit") == 0){
-			std::cout << "exiting" << std::endl;
-			auto const pair = userInfo.find(id);
-			if(pair != userInfo.end() && pair->second != ""){
-				// Exit room
-				rooms.exit(pair->second, id);
-			}
-			// Set to new room
-			userInfo.insert_or_assign(id, "");
+		else if(strcmp(tok, "/leave") == 0){
+			std::cout << "leaving" << std::endl;
+			rooms.leave(id);
 			return;
 		}
 	}
 } 
- 
-// Print out userInfo map
-void printUserInfo(void)
-{
-	std::cout << "Printing userInfo" << std::endl;
-	for(auto const &pair : userInfo){
-		std::cout << pair.first << ":" << pair.second << std::endl;
-	}
-}
 
 int main(void)
 {
@@ -205,16 +171,10 @@ int main(void)
 			// Connection closed
 			deleteEpoll(epollStruct.data.fd);
 			cache.remove(epollStruct.data.fd);
-			auto const pair = userInfo.find(epollStruct.data.fd);
-			if(pair != userInfo.end() && pair->second != ""){
-				// If user is in a room, exit the room
-				rooms.exit(pair->second, epollStruct.data.fd);
-			}
-			// Remove userInfo entry
-			userInfo.erase(epollStruct.data.fd);
+			rooms.remove(epollStruct.data.fd);
 			cache.printCache();
 			rooms.printChatRoom();
-			printUserInfo();
+			rooms.printUsers();
 		}
 		else{
 			std::cout << "fd: " << epollStruct.data.fd << " msg: " << recvBuf;
@@ -222,7 +182,7 @@ int main(void)
 			cache.update(epollStruct.data.fd);
 			cache.printCache();
 			rooms.printChatRoom();
-			printUserInfo();
+			rooms.printUsers();
 		}
 	}
 	
