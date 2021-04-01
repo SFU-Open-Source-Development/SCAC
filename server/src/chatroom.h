@@ -32,6 +32,12 @@ class ChatRoom
 		
 		// Leave the room
 		bool leave(U userId);
+
+		// Get the room they are currently in
+		R getRoom(U userId);
+
+		// Get a list of all users in the user's room
+		std::vector<U> getRoomMembers(U userId);
 		
 		// Print functions
 		void printUsers(void);
@@ -58,6 +64,9 @@ class ChatRoom<U, R>::Room
 		void add(U userId);
 		void remove(U userId);
 		
+		// Get room members
+		std::vector<U> getRoomMembers(void);
+
 		// Returns how many people are in the room
 		size_t getSize(void);
 		
@@ -97,6 +106,13 @@ void ChatRoom<U, R>::Room::remove(U userId)
 		// User not found
 		std::cout << "User is not in the room" << std::endl;
 	}
+}
+
+// Get room members
+template<typename U, typename R>
+std::vector<U> ChatRoom<U, R>::Room::getRoomMembers(void)
+{
+	return roomMembers;
 }
 
 // Returns number of users in the room
@@ -241,9 +257,44 @@ bool ChatRoom<U, R>::leave(U userId)
 		}
 	}
 	else{
-		// User is not in the room
+		// User is not in a room
 		return false;
 	}
+}
+
+// Get the room they are currently in
+template<typename U, typename R>
+R ChatRoom<U, R>::getRoom(U userId)
+{
+	auto const userInfo = users.find(userId);
+	if(userInfo != users.end()){
+		return userInfo->second;
+	}
+	else{
+		std::cerr << "User does not exist" << std::endl;
+		return "";
+	}
+}
+
+// Get a list of all users in the user's room
+template<typename U, typename R>
+std::vector<U> ChatRoom<U, R>::getRoomMembers(U userId)
+{
+	std::vector<U> roomMembers;
+	auto const userInfo = users.find(userId);
+	if(userInfo != users.end() && !userInfo->second.empty()){
+		auto const roomInfo = rooms.find(userInfo->second);
+		if(roomInfo != rooms.end()){
+			roomMembers = roomInfo->second->getRoomMembers();
+		}
+		else{
+			std::cerr << "Room does not exist" << std::endl;
+		}
+	}
+	else{
+		std::cerr << "User does not eixst" << std::endl;
+	}
+	return roomMembers;
 }
 
 // Prints all connected users

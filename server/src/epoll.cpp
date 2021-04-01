@@ -2,7 +2,7 @@
  * To connect to server, open a new terminal and type "netcat 127.0.0.1 12345"
  * To host a room, "/host myRoom". Does not work if room exists.
  * To join a room, "/join myRoom". Does not work if room does not exist.
- * To exit current room, "/exit".
+ * To exit current room, "/leave".
  */
 
 #include <iostream>
@@ -18,9 +18,7 @@
 #include "chatroom.h"
 
 
-// Declare epoll instance and tcp socket in global namespace TEMPORARY
-static int32_t epollfd;
-static int32_t sockfd;
+// Declare structures
 static LRUCache<int32_t> cache;
 static ChatRoom<int32_t, std::string> rooms;
 
@@ -49,7 +47,7 @@ static int32_t getSocket(void)
 }
 
 // Listens for incoming connections
-static void listenThread(void)
+static void listenThread(int32_t epollfd, int32_t sockfd)
 {
 
 	struct sockaddr_in peer_addr;
@@ -95,7 +93,7 @@ static int32_t getEpoll(void)
 }
 
 // Deletes epoll entry
-static void deleteEpoll(int32_t fd)
+static void deleteEpoll(int32_t epollfd, int32_t fd)
 {
 	int32_t res = epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, NULL);
 	if(res == -1){
@@ -117,6 +115,7 @@ template <typename T>
 static void messageParser(char *msg, T id)
 {
 	char *tok;
+	char sendBuf[1024];
 	if(msg[0] == '/'){
 		tok = std::strtok(msg, " \t\n\v\f\r");
 		if(!tok){
@@ -127,7 +126,20 @@ static void messageParser(char *msg, T id)
 			tok = std::strtok(NULL, " \t\n\v\f\r");
 			if(tok){
 				std::cout << "hosting: " << tok << std::endl;
-				rooms.host(id, tok);
+				if(rooms.host(id, tok)){
+					memset(sendBuf, 0, sizeof(sendBuf));
+					snprintf(sendBuf, 1024, "Created %s\n", tok);
+					if(send(id, sendBuf, 1024, 0) == -1){
+						std::cerr << "Error on sending" << std::endl;
+					}
+				}
+				else{
+					memset(sendBuf, 0, sizeof(sendBuf));
+					snprintf(sendBuf, 1024, "%s exists already\n", tok);
+					if(send(id, sendBuf, 1024, 0) == -1){
+						std::cerr << "Error on sending" << std::endl;
+					}
+				}
 			}
 			return;
 		}
@@ -135,24 +147,81 @@ static void messageParser(char *msg, T id)
 			tok = std::strtok(NULL, " \t\n\v\f\r");
 			if(tok){
 				std::cout << "joining: " << tok << std::endl;
-				rooms.join(id, tok);
+				if(rooms.join(id, tok)){
+					memset(sendBuf, 0, sizeof(sendBuf));
+					snprintf(sendBuf, 1024, "Joined %s\n", tok);
+					if(send(id, sendBuf, 1024, 0) == -1){
+						std::cerr << "Error on sending" << std::endl;
+					}
+				}
+				else{
+					memset(sendBuf, 0, sizeof(sendBuf));
+					snprintf(sendBuf, 1024, "%s does not exist\n", tok);
+					if(send(id, sendBuf, 1024, 0) == -1){
+						std::cerr << "Error on sending" << std::endl;
+					}
+				}
 			}
 			return;
 		}
 		else if(strcmp(tok, "/leave") == 0){
 			std::cout << "leaving" << std::endl;
-			rooms.leave(id);
+			std::string roomId = rooms.getRoom(id);
+			if(!roomId.empty()){
+				if(rooms.leave(id)){
+					memset(sendBuf, 0, sizeof(sendBuf));
+					// Need to convert std::string to char*
+					char roomName[512];
+					memset(roomName, 0, sizeof(roomName));
+					strcpy(roomName, roomId.c_str());
+					snprintf(sendBuf, 1024, "Left %s\n", roomName);
+					if(send(id, sendBuf, 1024, 0) == -1){
+						std::cerr << "Error on sending" << std::endl;
+					}
+				}
+				else{
+					std::cerr << "Exiting room failed" << std::endl;
+				}
+			}
+			else{
+				memset(sendBuf, 0, sizeof(sendBuf));
+				snprintf(sendBuf, 1024, "User is not in a room\n");
+				if(send(id, sendBuf, 1024, 0) == -1){
+					std::cerr << "Error on sending" << std::endl;
+				}
+			}
 			return;
 		}
 	}
-} 
+	else{
+		// Relay message
+		std::vector<T> allRoomMembers = rooms.getRoomMembers(id);
+		std::string roomId = rooms.getRoom(id);
+		if(!allRoomMembers.empty()){
+			memset(sendBuf, 0, sizeof(sendBuf));
+			snprintf(sendBuf, 1024, "%d: %s", id, msg);
+			for(auto e : allRoomMembers){
+				if(send(e, sendBuf, 1024, 0) == -1){
+					std::cerr << "Error on sending" << std::endl;
+				}
+			}
+		}
+	}
+}
+
+static void printState(void)
+{
+	cache.printCache();
+	rooms.printChatRoom();
+	rooms.printUsers();
+}
 
 int main(void)
 {
-	sockfd = getSocket();
-	epollfd = getEpoll();
-	
-	std::thread listenThreadId(listenThread);
+	int32_t sockfd = getSocket();
+	int32_t epollfd = getEpoll();
+
+	std::thread listenThreadId(listenThread, epollfd, sockfd);
 	
 	constexpr uint32_t buffSize = 1024;
 	char recvBuf[buffSize];
@@ -169,20 +238,16 @@ int main(void)
 		recvBuf[1023] = 0;
 		if(res == 0){
 			// Connection closed
-			deleteEpoll(epollStruct.data.fd);
+			deleteEpoll(epollfd, epollStruct.data.fd);
 			cache.remove(epollStruct.data.fd);
 			rooms.remove(epollStruct.data.fd);
-			cache.printCache();
-			rooms.printChatRoom();
-			rooms.printUsers();
+			printState();
 		}
 		else{
 			std::cout << "fd: " << epollStruct.data.fd << " msg: " << recvBuf;
 			messageParser(recvBuf, epollStruct.data.fd);
 			cache.update(epollStruct.data.fd);
-			cache.printCache();
-			rooms.printChatRoom();
-			rooms.printUsers();
+			printState();
 		}
 	}
 	
