@@ -241,7 +241,7 @@ bool ChatRoom<U, R>::leave(U userId)
 		}
 	}
 	else{
-		// User is not in the room
+		// User is not in a room
 		return false;
 	}
 }
