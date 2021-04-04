@@ -17,8 +17,8 @@ class LRUCache
 		List cache;
 	
 	public:
-		// Insert/Remove element
-		bool insert(T v);
+		// Add/Remove element
+		bool add(T v);
 		bool remove(T v);
 		
 		// Move element to end of list
@@ -51,8 +51,8 @@ class LRUCache<T>::List
 		Node *tail;
 	
 	public:
-		// Inserts/Removes the node
-		void insert(Node *node);
+		// Add/Remove the node
+		void add(Node *node);
 		void remove(Node *node);
 		
 		// Moves existing element to the end of the linked list
@@ -66,9 +66,9 @@ class LRUCache<T>::List
 		~List(void);
 };
 
-// Inserts the node
+// Add the node
 template<typename T>
-void LRUCache<T>::List::insert(Node *node)
+void LRUCache<T>::List::add(Node *node)
 {
 	if(!head){
 		// Empty list
@@ -114,7 +114,7 @@ template<typename T>
 void LRUCache<T>::List::update(Node *node)
 {
 	remove(node);
-	insert(node);
+	add(node);
 }
 		
 // Print the linked list
@@ -145,9 +145,9 @@ LRUCache<T>::List::~List(void)
 }
 
 
-// Insert element
+// Add element
 template<typename T>
-bool LRUCache<T>::insert(T v)
+bool LRUCache<T>::add(T v)
 {
 	if(map.find(v) == map.end()){
 		// Element does not exist
@@ -156,7 +156,7 @@ bool LRUCache<T>::insert(T v)
 			auto *node = new Node();
 			node->data = v;
 			map.insert({v, node});
-			cache.insert(node);
+			cache.add(node);
 			return true;
 		}
 		catch(const std::bad_alloc &e){

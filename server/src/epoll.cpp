@@ -3,6 +3,11 @@
  * To host a room, "/host myRoom". Does not work if room exists.
  * To join a room, "/join myRoom". Does not work if room does not exist.
  * To exit current room, "/leave".
+ * To create an account, "/create username password"
+ * To log into an account, "/login username password"
+ * To logout, "/logout"
+ * 
+ * Need sqlite3 and libsqlite3-dev packages
  */
 
 #include <iostream>
@@ -14,13 +19,17 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <sqlite3.h>
 #include "lrucache.h"
 #include "chatroom.h"
+#include "login.h"
+
 
 
 // Declare structures
 static LRUCache<int32_t> cache;
 static ChatRoom<int32_t, std::string> rooms;
+static Login<int32_t, std::string> name;
 
 // Generates and binds a tcp socket
 static int32_t getSocket(void)
@@ -73,12 +82,10 @@ static void listenThread(int32_t epollfd, int32_t sockfd)
 		if(epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &epollStruct) == -1){
 			std::cerr << "Error on epoll_ctl!" << std::endl;
 		}
-		
-		// Add to rooms
+		// Add to structures
 		rooms.add(fd);
-		
-		// Add to cache
-		cache.insert(fd);
+		cache.add(fd);
+		name.add(fd);
 	}
 }
 
@@ -117,24 +124,23 @@ static void messageParser(char *msg, T id)
 	char *tok;
 	char sendBuf[1024];
 	if(msg[0] == '/'){
-		tok = std::strtok(msg, " \t\n\v\f\r");
+		tok = strtok(msg, " \t\n\v\f\r");
 		if(!tok){
 			// No Command
 			return;
 		}
 		else if(strcmp(tok, "/host") == 0){
-			tok = std::strtok(NULL, " \t\n\v\f\r");
+			tok = strtok(NULL, " \t\n\v\f\r");
 			if(tok){
 				std::cout << "hosting: " << tok << std::endl;
+				memset(sendBuf, 0, sizeof(sendBuf));
 				if(rooms.host(id, tok)){
-					memset(sendBuf, 0, sizeof(sendBuf));
 					snprintf(sendBuf, 1024, "Created %s\n", tok);
 					if(send(id, sendBuf, 1024, 0) == -1){
 						std::cerr << "Error on sending" << std::endl;
 					}
 				}
 				else{
-					memset(sendBuf, 0, sizeof(sendBuf));
 					snprintf(sendBuf, 1024, "%s exists already\n", tok);
 					if(send(id, sendBuf, 1024, 0) == -1){
 						std::cerr << "Error on sending" << std::endl;
@@ -144,18 +150,17 @@ static void messageParser(char *msg, T id)
 			return;
 		}
 		else if(strcmp(tok, "/join") == 0){
-			tok = std::strtok(NULL, " \t\n\v\f\r");
+			tok = strtok(NULL, " \t\n\v\f\r");
 			if(tok){
 				std::cout << "joining: " << tok << std::endl;
+				memset(sendBuf, 0, sizeof(sendBuf));
 				if(rooms.join(id, tok)){
-					memset(sendBuf, 0, sizeof(sendBuf));
 					snprintf(sendBuf, 1024, "Joined %s\n", tok);
 					if(send(id, sendBuf, 1024, 0) == -1){
 						std::cerr << "Error on sending" << std::endl;
 					}
 				}
 				else{
-					memset(sendBuf, 0, sizeof(sendBuf));
 					snprintf(sendBuf, 1024, "%s does not exist\n", tok);
 					if(send(id, sendBuf, 1024, 0) == -1){
 						std::cerr << "Error on sending" << std::endl;
@@ -183,27 +188,99 @@ static void messageParser(char *msg, T id)
 					std::cerr << "Exiting room failed" << std::endl;
 				}
 			}
-			else{
+		}
+		else if(strcmp(tok, "/create") == 0){
+			std::cout << "Creating Account" << std::endl;
+			char *username;
+			char *password;
+			username = strtok(NULL, " \t\n\v\f\r");
+			if(username){
+				password = strtok(NULL, " \t\n\v\f\r");
+				if(password){
+					memset(sendBuf, 0, sizeof(sendBuf));
+					if(name.create(id, username, password)){
+						snprintf(sendBuf, 1024, "Created account %s\n", username);
+						if(send(id, sendBuf, 1024, 0) == -1){
+							std::cerr << "Error on sending" << std::endl;
+						}
+					}
+					else{
+						snprintf(sendBuf, 1024, "Username exists already.\n");
+						if(send(id, sendBuf, 1024, 0) == -1){
+							std::cerr << "Error on sending" << std::endl;
+						}
+					}
+				}
+			}
+		}
+		else if(strcmp(tok, "/login") == 0){
+			std::cout << "Logging in" << std::endl;
+			char *username;
+			char *password;
+			username = strtok(NULL, " \t\n\v\f\r");
+			if(username){
+				password = strtok(NULL, " \t\n\v\f\r");
+				if(password){
+					memset(sendBuf, 0, sizeof(sendBuf));
+					if(name.login(id, username, password)){
+						snprintf(sendBuf, 1024, "Logged in as %s\n", username);
+						if(send(id, sendBuf, 1024, 0) == -1){
+							std::cerr << "Error on sending" << std::endl;
+						}
+					}
+					else{
+						snprintf(sendBuf, 1024, "Wrong username/password.\n");
+						if(send(id, sendBuf, 1024, 0) == -1){
+							std::cerr << "Error on sending" << std::endl;
+						}
+					}
+				}
+			}
+		}
+		else if(strcmp(tok, "/logout") == 0){
+			std::cout << "Logging out" << std::endl;
+			if(name.logout(id)){
 				memset(sendBuf, 0, sizeof(sendBuf));
-				snprintf(sendBuf, 1024, "User is not in a room\n");
+				snprintf(sendBuf, 1024, "Logged out\n");
 				if(send(id, sendBuf, 1024, 0) == -1){
 					std::cerr << "Error on sending" << std::endl;
 				}
 			}
-			return;
+			else{
+				std::cerr << "Logging out failed" << std::endl;
+			}
 		}
+		else{
+			memset(sendBuf, 0, sizeof(sendBuf));
+			snprintf(sendBuf, 1024, "User is not in a room\n");
+			if(send(id, sendBuf, 1024, 0) == -1){
+				std::cerr << "Error on sending" << std::endl;
+			}
+		}
+		return;
 	}
 	else{
 		// Relay message
 		std::vector<T> allRoomMembers = rooms.getRoomMembers(id);
 		std::string roomId = rooms.getRoom(id);
+		std::string username = name.getName(id);
+		memset(sendBuf, 0, sizeof(sendBuf));
+		if(!username.empty()){
+			snprintf(sendBuf, 1024, "%s: %s", username.c_str(), msg);
+		}
+		else{
+			snprintf(sendBuf, 1024, "Guest %d: %s", id, msg);
+		}
 		if(!allRoomMembers.empty()){
-			memset(sendBuf, 0, sizeof(sendBuf));
-			snprintf(sendBuf, 1024, "%d: %s", id, msg);
 			for(auto e : allRoomMembers){
 				if(send(e, sendBuf, 1024, 0) == -1){
 					std::cerr << "Error on sending" << std::endl;
 				}
+			}
+		}
+		else{
+			if(send(id, sendBuf, 1024, 0) == -1){
+				std::cerr << "Error on sending" << std::endl;
 			}
 		}
 	}
@@ -213,7 +290,8 @@ static void printState(void)
 {
 	cache.printCache();
 	rooms.printChatRoom();
-	rooms.printUsers();
+	rooms.printSockets();
+	name.printSockets();
 }
 
 int main(void)
@@ -239,8 +317,10 @@ int main(void)
 		if(res == 0){
 			// Connection closed
 			deleteEpoll(epollfd, epollStruct.data.fd);
+			// Remove from structures
 			cache.remove(epollStruct.data.fd);
 			rooms.remove(epollStruct.data.fd);
+			name.remove(epollStruct.data.fd);
 			printState();
 		}
 		else{

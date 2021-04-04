@@ -9,38 +9,38 @@
 #include <unordered_map>
 #include <vector>
 
-template<typename U, typename R>
+template<typename S, typename R>
 class ChatRoom
 {
 	private:
 		class Room;
-		// Used as a reference to find which chatroom the user is in
-		std::unordered_map<U, R> users;
+		// Used as a reference to find which chatroom the socket is in
+		std::unordered_map<S, R> sockets;
 		// Links to the chatroom from a given room identifier
 		std::unordered_map<R, Room*> rooms;
 		
 	public:
-		// Add/Remove a user
-		bool add(U userId);
-		bool remove(U userId);
+		// Add/Remove a sockets
+		bool add(S socketId);
+		bool remove(S socketId);
 		
 		// Host a room
-		bool host(U userId, R roomId);
+		bool host(S socketId, R roomId);
 		
 		// Join a room
-		bool join(U userId, R roomId);
+		bool join(S socketId, R roomId);
 		
 		// Leave the room
-		bool leave(U userId);
+		bool leave(S socketId);
 
 		// Get the room they are currently in
-		R getRoom(U userId);
+		R getRoom(S socketId);
 
-		// Get a list of all users in the user's room
-		std::vector<U> getRoomMembers(U userId);
+		// Get a list of all sockets in the socket's room
+		std::vector<S> getRoomMembers(S socketId);
 		
 		// Print functions
-		void printUsers(void);
+		void printSockets(void);
 		void printChatRoom(void);
 		
 		// Constructor/Destructor
@@ -48,26 +48,26 @@ class ChatRoom
 		~ChatRoom(void);
 };
 
-// Container for room that holds all the users
-template<typename U, typename R>
-class ChatRoom<U, R>::Room
+// Container for room that holds all the sockets in the room
+template<typename S, typename R>
+class ChatRoom<S, R>::Room
 {
 	private:
 		R id;
-		std::vector<U> roomMembers;
+		std::vector<S> roomMembers;
 	
 	public:
 		// Set the room id
 		void setId(R roomId);
 		
-		// Insert/remove user
-		void add(U userId);
-		void remove(U userId);
+		// Insert/remove socket
+		void add(S socketId);
+		void remove(S socketId);
 		
 		// Get room members
-		std::vector<U> getRoomMembers(void);
+		std::vector<S> getRoomMembers(void);
 
-		// Returns how many people are in the room
+		// Returns how many sockets are in the room
 		size_t getSize(void);
 		
 		// Print functions
@@ -79,100 +79,100 @@ class ChatRoom<U, R>::Room
 };
 
 // Set the room id
-template<typename U, typename R>
-void ChatRoom<U, R>::Room::setId(R roomId)
+template<typename S, typename R>
+void ChatRoom<S, R>::Room::setId(R roomId)
 {
 	id = roomId;
 }
 
-// Insert user
-template<typename U, typename R>
-void ChatRoom<U, R>::Room::add(U userId)
+// Insert socket
+template<typename S, typename R>
+void ChatRoom<S, R>::Room::add(S socketId)
 {
-	roomMembers.push_back(userId);
+	roomMembers.push_back(socketId);
 }
 
-// Remove user
-template<typename U, typename R>
-void ChatRoom<U, R>::Room::remove(U userId)
+// Remove socket
+template<typename S, typename R>
+void ChatRoom<S, R>::Room::remove(S socketId)
 {
 	// Find index of person
-	auto it = std::find(roomMembers.begin(), roomMembers.end(), userId);
+	auto it = std::find(roomMembers.begin(), roomMembers.end(), socketId);
 	if(it != roomMembers.end()){
-		// User found
+		// Socket found
 		roomMembers.erase(it);
 	}
 	else{
-		// User not found
+		// Socket not found
 		std::cout << "User is not in the room" << std::endl;
 	}
 }
 
 // Get room members
-template<typename U, typename R>
-std::vector<U> ChatRoom<U, R>::Room::getRoomMembers(void)
+template<typename S, typename R>
+std::vector<S> ChatRoom<S, R>::Room::getRoomMembers(void)
 {
 	return roomMembers;
 }
 
-// Returns number of users in the room
-template<typename U, typename R>
-size_t ChatRoom<U, R>::Room::getSize(void)
+// Returns number of sockets in the room
+template<typename S, typename R>
+size_t ChatRoom<S, R>::Room::getSize(void)
 {
 	return roomMembers.size();
 }
 
 // Print all users in the room
-template<typename U, typename R>
-void ChatRoom<U, R>::Room::printRoomMembers(void)
+template<typename S, typename R>
+void ChatRoom<S, R>::Room::printRoomMembers(void)
 {
 	std::cout << "Room ID: " << id << std::endl;
-	for(auto const &u : roomMembers){
-		std::cout << u << ' ';
+	for(auto const &s : roomMembers){
+		std::cout << s << ' ';
 	}
 	std::cout << std::endl;
 }
 
 // Constructor
-template<typename U, typename R>
-ChatRoom<U, R>::Room::Room(void)
+template<typename S, typename R>
+ChatRoom<S, R>::Room::Room(void)
 {
 
 }
 
 // Destructor
-template<typename U, typename R>
-ChatRoom<U, R>::Room::~Room(void)
+template<typename S, typename R>
+ChatRoom<S, R>::Room::~Room(void)
 {
 
 }
 
-// Insert a user into users
-template<typename U, typename R>
-bool ChatRoom<U, R>::add(U userId)
+// Insert a socket into sockets
+template<typename S, typename R>
+bool ChatRoom<S, R>::add(S socketId)
 {
-	if(!users.contains(userId)){
-		// User does not exist
-		// Insert a user in, with a blank identifier
-		users.insert({userId, ""});
+	if(!sockets.contains(socketId)){
+		// Socket does not exist
+		// Insert socket in, with a blank identifier
+		sockets.insert({socketId, ""});
 		return true;
 	}
 	else{
-		// User already exists
+		// Socket already exists
 		std::cout << "User exists already" << std::endl;
 		return false;
 	}
 }
 
-// Deletes a user from users
-template<typename U, typename R>
-bool ChatRoom<U, R>::remove(U userId)
+// Deletes a socket from Sockets
+template<typename S, typename R>
+bool ChatRoom<S, R>::remove(S socketId)
 {
-	auto const userInfo = users.find(userId);
-	if(userInfo != users.end()){
-		// User exists
-		leave(userId);
-		users.erase(userId);
+	auto const socketRoom = sockets.find(socketId);
+	if(socketRoom != sockets.end()){
+		// Socket exists
+		leave(socketId);
+		sockets.erase(socketId);
 		return true;
 	}
 	else{
@@ -182,22 +182,22 @@ bool ChatRoom<U, R>::remove(U userId)
 }
 
 // Host a room
-template<typename U, typename R>
-bool ChatRoom<U, R>::host(U userId, R roomId)
+template<typename S, typename R>
+bool ChatRoom<S, R>::host(S socketId, R roomId)
 {
 	if(!rooms.contains(roomId)){
 		// Room does not exist
 		try{
-			// Create the room, and insert user into the room
+			// Create the room, and insert socket into the room
 			auto *room = new Room();
 			room->setId(roomId);
-			room->add(userId);
+			room->add(socketId);
 			// Add the room to rooms
 			rooms.insert({roomId, room});
 			
-			// Remove user from the current room they are in
-			leave(userId);
-			users.insert_or_assign(userId, roomId);
+			// Remove socket from the current room they are in
+			leave(socketId);
+			sockets.insert_or_assign(socketId, roomId);
 			return true;
 		}
 		catch(const std::bad_alloc &e){
@@ -213,16 +213,16 @@ bool ChatRoom<U, R>::host(U userId, R roomId)
 }
 
 // Join an existing room
-template<typename U, typename R>
-bool ChatRoom<U, R>::join(U userId, R roomId)
+template<typename S, typename R>
+bool ChatRoom<S, R>::join(S socketId, R roomId)
 {
 	auto const roomInfo = rooms.find(roomId);
 	if(roomInfo != rooms.end()){
 		// Room exists
-		roomInfo->second->add(userId);
-		// Remove user from current room
-		leave(userId);
-		users.insert_or_assign(userId, roomId);
+		roomInfo->second->add(socketId);
+		// Remove socket from current room
+		leave(socketId);
+		sockets.insert_or_assign(socketId, roomId);
 		return true;
 	}
 	else{
@@ -232,23 +232,23 @@ bool ChatRoom<U, R>::join(U userId, R roomId)
 	}
 }
 
-// Leave room if user is in a room
-template<typename U, typename R>
-bool ChatRoom<U, R>::leave(U userId)
+// Leave room if socket is in a room
+template<typename S, typename R>
+bool ChatRoom<S, R>::leave(S socketId)
 {
-	auto const userInfo = users.find(userId);
-	if(userInfo != users.end() && !userInfo->second.empty()){
-		// Remove user from room
+	auto const socketRoom = sockets.find(socketId);
+	if(socketRoom != sockets.end() && !socketRoom->second.empty()){
+		// Remove socket from room
 		// Get the room
-		auto const roomInfo = rooms.find(userInfo->second);
+		auto const roomInfo = rooms.find(socketRoom->second);
 		if(roomInfo != rooms.end()){
-			roomInfo->second->remove(userId);
+			roomInfo->second->remove(socketId);
 			if(roomInfo->second->getSize() == 0){
 				// Room empty, delete room
 				delete roomInfo->second;
 				rooms.erase(roomInfo->first);
 			}
-			users.insert_or_assign(userId, "");
+			sockets.insert_or_assign(socketId, "");
 			return true;
 		}
 		else{
@@ -257,18 +257,18 @@ bool ChatRoom<U, R>::leave(U userId)
 		}
 	}
 	else{
-		// User is not in a room
+		// Socket is not in a room
 		return false;
 	}
 }
 
 // Get the room they are currently in
-template<typename U, typename R>
-R ChatRoom<U, R>::getRoom(U userId)
+template<typename S, typename R>
+R ChatRoom<S, R>::getRoom(S socketId)
 {
-	auto const userInfo = users.find(userId);
-	if(userInfo != users.end()){
-		return userInfo->second;
+	auto const socketRoom = sockets.find(socketId);
+	if(socketRoom != sockets.end()){
+		return socketRoom->second;
 	}
 	else{
 		std::cerr << "User does not exist" << std::endl;
@@ -276,14 +276,14 @@ R ChatRoom<U, R>::getRoom(U userId)
 	}
 }
 
-// Get a list of all users in the user's room
-template<typename U, typename R>
-std::vector<U> ChatRoom<U, R>::getRoomMembers(U userId)
+// Get a list of all sockets in the socket's room
+template<typename S, typename R>
+std::vector<S> ChatRoom<S, R>::getRoomMembers(S socketId)
 {
-	std::vector<U> roomMembers;
-	auto const userInfo = users.find(userId);
-	if(userInfo != users.end() && !userInfo->second.empty()){
-		auto const roomInfo = rooms.find(userInfo->second);
+	std::vector<S> roomMembers;
+	auto const socketRoom = sockets.find(socketId);
+	if(socketRoom != sockets.end() && !socketRoom->second.empty()){
+		auto const roomInfo = rooms.find(socketRoom->second);
 		if(roomInfo != rooms.end()){
 			roomMembers = roomInfo->second->getRoomMembers();
 		}
@@ -297,19 +297,19 @@ std::vector<U> ChatRoom<U, R>::getRoomMembers(U userId)
 	return roomMembers;
 }
 
-// Prints all connected users
-template<typename U, typename R>
-void ChatRoom<U, R>::printUsers(void)
+// Prints all connected sockets
+template<typename S, typename R>
+void ChatRoom<S, R>::printSockets(void)
 {
-	std::cout << "Printing users" << std::endl;
-	for(auto const &userInfo : users){
-		std::cout << userInfo.first << ":" << userInfo.second << std::endl;
+	std::cout << "Printing socket rooms" << std::endl;
+	for(auto const &socketRoom : sockets){
+		std::cout << socketRoom.first << ":" << socketRoom.second << std::endl;
 	}
 }
 
 // Iterate through all the rooms and print the users
-template<typename U, typename R>
-void ChatRoom<U, R>::printChatRoom(void)
+template<typename S, typename R>
+void ChatRoom<S, R>::printChatRoom(void)
 {
 	std::cout << "Printing rooms" << std::endl;
 	for(auto const &roomInfo : rooms){
@@ -318,15 +318,15 @@ void ChatRoom<U, R>::printChatRoom(void)
 }
 
 // Constructor
-template<typename U, typename R>
-ChatRoom<U, R>::ChatRoom(void)
+template<typename S, typename R>
+ChatRoom<S, R>::ChatRoom(void)
 {
 
 }
 
 // Destructor
-template<typename U, typename R>
-ChatRoom<U, R>::~ChatRoom(void)
+template<typename S, typename R>
+ChatRoom<S, R>::~ChatRoom(void)
 {
 
 }
